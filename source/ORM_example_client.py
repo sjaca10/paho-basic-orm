@@ -2,13 +2,14 @@ from pymongo import MongoClient
 import MySQLdb
 import paho.mqtt.client as mqtt
 import json
+import psycopg2
 
 def on_connect(client, userdata, rc):
 	print "Client connected with result {0}".format(rc)
-	client.subscribe("mongodb/kliento/position")
-	client.subscribe("mysql/kliento/position")
-	client.subscribe("redis/kliento/position")
-	client.subscribe("postgresql/kliento/position")
+	client.subscribe("mongodb/company/ping")
+	client.subscribe("mysql/company/ping")
+	client.subscribe("redis/company/ping")
+	client.subscribe("postgresql/company/ping")
 
 def on_subscribe(client, userdata, mid, granted_qos):
 	print "Subscribed with Quality of Service {0}".format(granted_qos)
@@ -29,7 +30,7 @@ def insert(dbms, database, table, payload):
 	elif dbms == "redis":
 		print "Inserted on {0}".format(dbms)
 	elif dbms == "postgresql":
-		print "Inserted on {0}".format(dbms)
+		client.postgresql(database, table, data)
 	else:
 		print "Unsupported DBMS"
 
@@ -41,7 +42,7 @@ def mongo(database, table, data):
 	# Inserting data on a collection
 	item = db[table].insert_one(data)
 	# Showing result
-	print "Inserted item {0} on {1}".format(item.inserted_id, dbms)
+	print "Inserted item {0} on {1}".format(item.inserted_id, database)
 
 def mysql(database, table, data):
 	# Getting a client
@@ -56,15 +57,32 @@ def mysql(database, table, data):
 	cursor.close()
 	mysql.close()
 	# Showing result
-	print "Inserted tuple {0} on {1}".format(cursor.lastrowid, dbms)
+	print "Inserted tuple {0} on {1}".format(cursor.lastrowid, database)
 
-client = mqtt.Client()
-client.on_connect = on_connect
+def postgresql(database, table, data):
+	# Connect to an existing database
+	postgresql = psycopg2.connect("dbname = " + database + "user = root")
+	# Open a cursor to perform database operations
+	cursor = postgresql.cursor()
+	# Pass data to fill a query placeholders and let Psycopg perform
+	# the correct conversion (no more SQL injections!)
+	cursor.execute("INSERT INTO %s (latitude, longitude) VALUES (%s, %s)", (table, data["latitude"], data["longitude"]))
+	# make the changes to the database persistent
+	postgresql.commit()
+	# Close communication with the database
+	cursor.close()
+	postgresql.close()
+	# Showing result
+	print "Inserted tuple {0} on {1}".format(cursor.lastrowid, database)
+
+client              = mqtt.Client()
+client.on_connect   = on_connect
 client.on_subscribe = on_subscribe
-client.on_message = on_message
-client.insert = insert
-client.mongo = mongo
-client.mysql = mysql
+client.on_message   = on_message
+client.insert       = insert
+client.mongo        = mongo
+client.mysql        = mysql
+client.postgresql   = postgresql
 
-client.connect("45.55.210.26", 1883, 60)
+client.connect("localhost", 1883, 60)
 client.loop_forever()
