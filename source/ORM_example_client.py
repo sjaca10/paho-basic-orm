@@ -61,12 +61,12 @@ def mysql(database, table, data):
 
 def postgresql(database, table, data):
 	# Connect to an existing database
-	postgresql = psycopg2.connect("dbname = " + database + "user = root")
+	postgresql = psycopg2.connect(database = database, user = "companyuser", password = "companyuser")
 	# Open a cursor to perform database operations
 	cursor = postgresql.cursor()
 	# Pass data to fill a query placeholders and let Psycopg perform
 	# the correct conversion (no more SQL injections!)
-	cursor.execute("INSERT INTO %s (latitude, longitude) VALUES (%s, %s)", (table, data["latitude"], data["longitude"]))
+	cursor.execute("INSERT INTO " + table + " (latitude, longitude) VALUES (%s, %s)", (data["latitude"], data["longitude"]))
 	# make the changes to the database persistent
 	postgresql.commit()
 	# Close communication with the database
